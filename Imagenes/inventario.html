@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Food Truck Tenancingo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+        }
+        nav ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            background-color: #4d4a4a;
+        }
+        nav ul li {
+            margin: 0 10px;
+        }
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            display: block;
+        }
+        h1 {
+            color: #000000;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #dee2e6;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f80707;
+            color: white;
+        }
+        button {
+            background-color: #d80606;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #9e0909;
+        }
+        #totalPrice {
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: right;
+            margin-top: 10px;
+        }
+        .autocomplete-suggestions {
+            border: 1px solid #ced4da;
+            border-top: none;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            position: absolute;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: white;
+            z-index: 1000;
+        }
+        .autocomplete-suggestions li {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            cursor: pointer;
+        }
+        .autocomplete-suggestions img {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+        }
+        .autocomplete-suggestions li:hover {
+            background-color: #e9ecef;
+        }
+    </style>
+    <!-- Incluir jsPDF desde un CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+    <nav>
+        <ul>
+            <li><a href="main.html">Inicio</a></li>
+            <li><a href="inventario.html">Registradora</a></li>
+            <li><a href="Info.html">Acerca de...</a></li>
+        </ul>
+    </nav>
+<h1>Sistema de registro de Ventas</h1>
+
+<h2>Agregar Producto</h2>
+<form id="productForm">
+    <label for="productName">Nombre del Producto:</label><br>
+    <input type="text" id="productName" name="productName" required autocomplete="off"><br>
+    <ul id="suggestions" class="autocomplete-suggestions"></ul>
+    <label for="productQuantity">Cantidad:</label><br>
+    <input type="number" id="productQuantity" name="productQuantity" required><br>
+    <label for="productPrice">Precio Unitario:</label><br>
+    <input type="number" id="productPrice" name="productPrice" required step="0.01"><br><br>
+    <button type="submit">Agregar Producto</button>
+</form>
+
+<h2>Resgistradora</h2>
+<table id="inventoryTable">
+    <thead>
+        <tr>
+            <th>Nombre del Producto</th>
+            <th>Cantidad</th>
+            <th>Precio Unitario</th>
+            <th>Precio Total</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Filas del inventario se agregarán aquí dinámicamente -->
+    </tbody>
+</table>
+
+<div id="totalPrice">Total Precio: $0.00</div>
+
+<button id="saveButton">Guardar Inventario</button>
+<button id="clearButton">Borrar Todo</button>
+<button id="downloadButton">Descargar Ticket</button>
+
+<script>
+    const { jsPDF } = window.jspdf;
+
+    const productForm = document.getElementById('productForm');
+    const inventoryTable = document.getElementById('inventoryTable').getElementsByTagName('tbody')[0];
+    const totalPriceElement = document.getElementById('totalPrice');
+    const productNameInput = document.getElementById('productName');
+    const suggestions = document.getElementById('suggestions');
+
+    const saveButton = document.getElementById('saveButton');
+    const clearButton = document.getElementById('clearButton');
+    const downloadButton = document.getElementById('downloadButton');
+
+    let inventory = [];
+    let totalPrice = 0;
+
+    const restaurantProducts = [
+        { name: 'Hamburguesa Junior', price: 65.00, image: 'Hjunior.PNG' },
+        { name: 'Hamburguesa Hawaiana', price: 70.00, image: 'Hhawaiana.PNG' },
+        { name: 'Hamburguesa Arrachera', price: 75.00, image: 'Harrachera.PNG' },
+        { name: 'Hamburguesa de Pollo', price: 70.00, image: 'Hpollo.PNG' },
+        { name: 'Hamburguesa Especial', price: 90.00, image: 'Hespecial.PNG' },
+        { name: 'Hamburguesa de Camarones', price: 95.00, image: 'Hcamaron.PNG' },
+        { name: 'Hamburguesa Doble', price: 95.00, image: 'Hdoble.PNG' },
+        { name: 'Hamburguesa de Sirloin', price: 85.00, image: 'Hsirlon.PNG' },
+        { name: 'Hot dog Sencillo', price: 30.00, image: 'HDsencillo.PNG' },
+        { name: 'Hot dog Tocino', price: 40.00, image: 'HDtocino.PNG' },
+        { name: 'Hot dog Especial', price: 45.00, image: 'HDespecial.PNG' },
+        { name: 'Burrito de Pastor', price: 90.99, image: 'Burrito.PNG' },
+        { name: 'Burrito de Alambre y bistec', price: 90.00, image: 'Balambre.PNG' },
+        { name: 'Nuggets', price: 50.00, image: 'Nuggets.PNG' },
+        { name: 'Papas de gajo', price: 50.00, image: 'papas.PNG' },
+        { name: 'Micheladas', price: 45.00, image: 'Michelada.PNG' },
+        { name: 'Piña Colada', price: 85.00, image: 'Piña.PNG' },
+        // Agrega más productos aquí
+    ];
+
+    productForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const productName = document.getElementById('productName').value;
+        const productQuantity = parseInt(document.getElementById('productQuantity').value);
+        const productPrice = parseFloat(document.getElementById('productPrice').value);
+        const productTotalPrice = productQuantity * productPrice;
+
+        const product = { name: productName, quantity: productQuantity, price: productPrice, totalPrice: productTotalPrice };
+        inventory.push(product);
+        updateInventoryTable();
+        productForm.reset();
+        suggestions.innerHTML = '';
+    });
+
+    productNameInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        suggestions.innerHTML = '';
+        if (query) {
+            restaurantProducts.forEach(product => {
+                if (product.name.toLowerCase().includes(query)) {
+                    const suggestionItem = document.createElement('li');
+                    const productImage = document.createElement('img');
+                    productImage.src = product.image;
+                    suggestionItem.appendChild(productImage);
+                    suggestionItem.appendChild(document.createTextNode(product.name));
+                    suggestionItem.addEventListener('click', () => selectSuggestion(product));
+                    suggestions.appendChild(suggestionItem);
+                }
+            });
+        }
+    });
+
+    saveButton.addEventListener('click', function() {
+        localStorage.setItem('inventory', JSON.stringify(inventory));
+        alert('Inventario guardado correctamente.');
+    });
+
+    clearButton.addEventListener('click', function() {
+        inventory = [];
+        updateInventoryTable();
+        localStorage.removeItem('inventory');
+        alert('Inventario borrado correctamente.');
+    });
+
+    downloadButton.addEventListener('click', function() {
+        const doc = new jsPDF();
+        doc.setFontSize(12);
+        doc.text('The Food Truck Tenancingo', 10, 10);
+        doc.text('Ticket de Compra', 10, 20);
+        const today = new Date();
+        const dateStr = `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
+        doc.text(`Fecha: ${dateStr}`, 10, 30);
+        doc.text('-------------------------------', 10, 40);
+        let y = 50;
+
+        inventory.forEach(product => {
+            doc.text(`Producto: ${product.name}`, 10, y);
+            doc.text(`Cantidad: ${product.quantity}`, 10, y + 10);
+            doc.text(`Precio Unitario: $${product.price.toFixed(2)}`, 10, y + 20);
+            doc.text(`Total: $${product.totalPrice.toFixed(2)}`, 10, y + 30);
+            doc.text('-------------------------------', 10, y + 40);
+            y += 50;
+        });
+
+        doc.text(`Total a Pagar: $${totalPrice.toFixed(2)}`, 10, y);
+        doc.save(`Ticket_${dateStr}.pdf`);
+    });
+
+    function selectSuggestion(product) {
+        document.getElementById('productName').value = product.name;
+        document.getElementById('productPrice').value = product.price;
+        suggestions.innerHTML = '';
+    }
+
+    function updateInventoryTable() {
+        inventoryTable.innerHTML = '';
+        totalPrice = 0;
+        inventory.forEach((product, index) => {
+            const row = inventoryTable.insertRow();
+            row.insertCell(0).textContent = product.name;
+            row.insertCell(1).textContent = product.quantity;
+            row.insertCell(2).textContent = product.price.toFixed(2);
+            row.insertCell(3).textContent = product.totalPrice.toFixed(2);
+            const actionsCell = row.insertCell(4);
+            
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Editar';
+            editButton.addEventListener('click', () => editProduct(index));
+            actionsCell.appendChild(editButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Eliminar';
+            deleteButton.style.marginLeft = '10px';
+            deleteButton.addEventListener('click', () => deleteProduct(index));
+            actionsCell.appendChild(deleteButton);
+
+            totalPrice += product.totalPrice;
+        });
+        totalPriceElement.textContent = `Total Precio: $${totalPrice.toFixed(2)}`;
+    }
+
+    function editProduct(index) {
+        const product = inventory[index];
+        document.getElementById('productName').value = product.name;
+        document.getElementById('productQuantity').value = product.quantity;
+        document.getElementById('productPrice').value = product.price;
+
+        inventory.splice(index, 1);
+        updateInventoryTable();
+    }
+
+    function deleteProduct(index) {
+        inventory.splice(index, 1);
+        updateInventoryTable();
+    }
+
+    // Cargar inventario guardado en el almacenamiento local
+    window.onload = function() {
+        const savedInventory = localStorage.getItem('inventory');
+        if (savedInventory) {
+            inventory = JSON.parse(savedInventory);
+            updateInventoryTable();
+        }
+    };
+</script>
+
+</body>
+</html>
